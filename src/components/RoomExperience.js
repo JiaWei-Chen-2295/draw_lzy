@@ -20,12 +20,40 @@ function WaitingCard({ title, body }) {
   );
 }
 
+function mergeStrokes(serverStrokes = [], localStrokes = []) {
+  const seen = new Set();
+  const merged = [];
+
+  [...serverStrokes, ...localStrokes].forEach((stroke) => {
+    if (!stroke?.strokeId || seen.has(stroke.strokeId)) {
+      return;
+    }
+
+    seen.add(stroke.strokeId);
+    merged.push(stroke);
+  });
+
+  return merged;
+}
+
 export function RoomExperience({ roomCode }) {
   const router = useRouter();
-  const { room, session, isLoading, error, hydrateSession, setSession, refreshRoom, initRealtime, cleanupRealtime, postAndApply, clearError } =
-    useRoomStore();
+  const {
+    room,
+    session,
+    isLoading,
+    error,
+    hydrateSession,
+    setSession,
+    refreshRoom,
+    initRealtime,
+    cleanupRealtime,
+    postAndApply,
+    clearError,
+  } = useRoomStore();
   const [intent, setIntent] = useState({ focusChoice: "", vibeChoice: "" });
   const [guess, setGuess] = useState({ focusChoice: "", vibeChoice: "" });
+  const [localDraft, setLocalDraft] = useState(null);
 
   useEffect(() => {
     const restored = hydrateSession();
@@ -62,6 +90,17 @@ export function RoomExperience({ roomCode }) {
   const isDrawer = currentRound?.drawerPlayerId === session?.playerId;
   const isGuesser = currentRound?.guesserPlayerId === session?.playerId;
   const isGameFinished = room?.status === "finished";
+  const displayedStrokes = useMemo(() => {
+    if (!currentRound) {
+      return [];
+    }
+
+    if (!localDraft || localDraft.roundId !== currentRound.roundId) {
+      return currentRound.strokes ?? [];
+    }
+
+    return mergeStrokes(currentRound.strokes ?? [], localDraft.strokes ?? []);
+  }, [currentRound, localDraft]);
 
   async function handleStartGame() {
     clearError();
@@ -78,8 +117,22 @@ export function RoomExperience({ roomCode }) {
     });
   }
 
+  function applyOptimisticStrokes(nextStrokes) {
+    if (!currentRound) {
+      return;
+    }
+
+    setLocalDraft({
+      roundId: currentRound.roundId,
+      strokes: nextStrokes,
+    });
+  }
+
   async function handleStrokeCommitted(stroke) {
-    await fetch("/api/realtime/publish", {
+    const optimisticStrokes = [...(currentRound.strokes ?? []), stroke];
+    applyOptimisticStrokes(optimisticStrokes);
+
+    const response = await fetch("/api/realtime/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -88,11 +141,16 @@ export function RoomExperience({ roomCode }) {
         payload: { roundId: currentRound.roundId, stroke },
       }),
     });
-    await refreshRoom(roomCode);
+
+    if (!response.ok) {
+      await refreshRoom(roomCode);
+    }
   }
 
   async function handleReplaceStrokes(strokes) {
-    await fetch("/api/realtime/publish", {
+    applyOptimisticStrokes(strokes);
+
+    const response = await fetch("/api/realtime/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -101,7 +159,10 @@ export function RoomExperience({ roomCode }) {
         payload: { roundId: currentRound.roundId, strokes },
       }),
     });
-    await refreshRoom(roomCode);
+
+    if (!response.ok) {
+      await refreshRoom(roomCode);
+    }
   }
 
   async function handleSubmitDrawing(payload) {
@@ -126,6 +187,7 @@ export function RoomExperience({ roomCode }) {
     }
 
     await postAndApply("/api/rounds/start", { roomCode });
+    setLocalDraft(null);
     setIntent({ focusChoice: "", vibeChoice: "" });
     setGuess({ focusChoice: "", vibeChoice: "" });
   }
@@ -181,7 +243,7 @@ export function RoomExperience({ roomCode }) {
             isDrawer ? (
               <DrawingCanvas
                 round={currentRound}
-                strokes={currentRound.strokes}
+                strokes={displayedStrokes}
                 onStrokeCommitted={handleStrokeCommitted}
                 onReplaceAllStrokes={handleReplaceStrokes}
                 onSubmitDrawing={handleSubmitDrawing}
@@ -190,7 +252,7 @@ export function RoomExperience({ roomCode }) {
             ) : (
               <div className="space-y-4">
                 <WaitingCard title="你可以看到画面在慢慢长出来" body="这一轮你先当观察者，等对方画完，你再做选择题。" />
-                <DrawingCanvas round={currentRound} strokes={currentRound.strokes} readOnly />
+                <DrawingCanvas round={currentRound} strokes={displayedStrokes} readOnly />
               </div>
             )
           ) : null}
@@ -198,7 +260,7 @@ export function RoomExperience({ roomCode }) {
           {currentRound.phase === "guessing" ? (
             isGuesser ? (
               <div className="space-y-4">
-                <DrawingCanvas round={currentRound} strokes={currentRound.strokes} readOnly />
+                <DrawingCanvas round={currentRound} strokes={displayedStrokes} readOnly />
                 <GuessPicker round={currentRound} value={guess} onChange={setGuess} onSubmit={handleGuessSubmit} isSubmitting={isLoading} />
               </div>
             ) : (

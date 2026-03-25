@@ -46,6 +46,8 @@ export function DrawingCanvas({
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
   const pointsRef = useRef([]);
+  const renderedStrokeIdsRef = useRef([]);
+  const renderedRoundIdRef = useRef(null);
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState(COLORS[0]);
   const [size, setSize] = useState(8);
@@ -66,10 +68,28 @@ export function DrawingCanvas({
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
+      renderedStrokeIdsRef.current = [];
     }
 
-    redrawCanvas(canvas, preparedStrokes);
-  }, [preparedStrokes]);
+    const nextStrokeIds = preparedStrokes.map((stroke) => stroke.strokeId);
+    const previousStrokeIds = renderedStrokeIdsRef.current;
+    const roundChanged = renderedRoundIdRef.current !== round?.roundId;
+    const lengthShrank = nextStrokeIds.length < previousStrokeIds.length;
+    const prefixChanged = previousStrokeIds.some((strokeId, index) => nextStrokeIds[index] !== strokeId);
+
+    if (roundChanged || lengthShrank || prefixChanged) {
+      redrawCanvas(canvas, preparedStrokes);
+      renderedStrokeIdsRef.current = nextStrokeIds;
+      renderedRoundIdRef.current = round?.roundId ?? null;
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    const previousCount = previousStrokeIds.length;
+    preparedStrokes.slice(previousCount).forEach((stroke) => drawStroke(context, stroke));
+    renderedStrokeIdsRef.current = nextStrokeIds;
+    renderedRoundIdRef.current = round?.roundId ?? null;
+  }, [preparedStrokes, round?.roundId]);
 
   function pointFromEvent(event) {
     const canvas = canvasRef.current;

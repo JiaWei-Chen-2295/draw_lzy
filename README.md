@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 任意门
 
-## Getting Started
+一个双人、双设备、面对面的抽象绘画小游戏。它不做“关系测试”，而是借由 6 轮抽象表达，让两个人交换“最近、现在，和一点点接下来”的理解偏差。
 
-First, run the development server:
+## 文档导航
+
+- 规格原文：[specs/project-spec.md](/D:/a_my_project/draw_lzy/specs/project-spec.md)
+- 架构与实现说明：[docs/architecture.md](/D:/a_my_project/draw_lzy/docs/architecture.md)
+
+## 当前实现范围
+
+当前仓库已实现 MVP 主链路：
+
+- 创建房间 / 加入房间
+- 房主开始游戏
+- 固定 6 轮流程
+- 作画者先做隐藏选择
+- Canvas 作画、逐笔同步、撤销、清空
+- 猜测者双选择题作答
+- 揭晓结果与基础 summary
+- localStorage 会话恢复
+- Redis / Blob 可选接入，本地 fallback 可运行
+
+## 技术栈
+
+- Next.js 16 App Router
+- React 19
+- JavaScript
+- Tailwind CSS 4
+- Zustand
+- Upstash Redis REST
+- Vercel Blob
+
+## 本地启动
+
+1. 安装依赖
+
+```bash
+npm install
+```
+
+2. 准备环境变量
+
+编辑 [.env.local](/D:/a_my_project/draw_lzy/.env.local)：
+
+```env
+BLOB_READ_WRITE_TOKEN=
+BLOB_ACCESS=private
+
+KV_REST_API_READ_ONLY_TOKEN=
+KV_REST_API_TOKEN=
+KV_REST_API_URL=
+KV_URL=
+REDIS_URL=
+
+UPSTASH_REDIS_REST_URL=$KV_REST_API_URL
+UPSTASH_REDIS_REST_TOKEN=$KV_REST_API_TOKEN
+```
+
+说明：
+
+- 不填 Redis / Blob 也能本地跑通基本流程，但只适合单实例开发测试
+- 要测试真实双端同步与持久化，建议配置 `KV_REST_API_URL`、`KV_REST_API_TOKEN`、`BLOB_READ_WRITE_TOKEN`
+- 如果 Blob store 是 private，建议显式加 `BLOB_ACCESS=private`
+
+3. 启动开发环境
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+默认访问 [http://localhost:3000](http://localhost:3000)。
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 常用命令
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run start
+```
 
-## Learn More
+## 目录概览
 
-To learn more about Next.js, take a look at the following resources:
+```txt
+src/
+  app/                 页面与 API 路由
+  components/          UI 与流程组件
+  lib/                 常量、题库、纯逻辑、适配器
+  lib/server/          房间服务与服务端存储
+  store/               Zustand 房间状态
+docs/
+  architecture.md      业务逻辑与实现说明
+specs/
+  project-spec.md      原始规格
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 关键业务约束
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- 固定双人，不支持观战
+- 固定 6 轮，顺序为 `A-C-A-C-A-D`
+- 不做关系定义类题目，不引导“我们之间是什么”
+- 猜测者只做选择题，不做自由输入
+- 实时同步粒度是 stroke，不是 point
+- Blob 只做归档，不负责实时同步
 
-## Deploy on Vercel
+## 当前实现取舍
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- 实时层目前是“轮询事件流 + 房间刷新”的轻量实现，不是 WebSocket
+- 房间内主流程集中在一个路由 `/room/[roomCode]`
+- Canvas 优先本地绘制，再异步同步到服务端
+- Blob 上传失败时会退回 data URL，保证流程不中断
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 已知限制
+
+- `tmp-app/` 是早期脚手架残留目录，已被 `.gitignore` 忽略，但最好后续手动清理
+- private Blob store 下虽然可上传，但如果后续要长期稳定展示归档图片，建议补服务端签名读取方案
+- 目前 Redis 读写使用 Upstash REST 变量，`REDIS_URL` 还未直接接入业务逻辑
+
+## 验证状态
+
+当前仓库最近一次改动后已通过：
+
+- `npm run lint`
+- `npm run build`

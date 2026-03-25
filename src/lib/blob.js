@@ -13,13 +13,23 @@ export async function uploadDrawingImage({ roomCode, roundId, base64Data, conten
     return fallbackDataUrl(contentType, base64Data);
   }
 
-  const buffer = Buffer.from(base64Data, "base64");
-  const blob = await put(`rooms/${roomCode}/rounds/${roundId}/drawing.png`, buffer, {
-    access: "public",
-    contentType,
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-    addRandomSuffix: false,
-  });
+  try {
+    const buffer = Buffer.from(base64Data, "base64");
+    const access = process.env.BLOB_ACCESS;
+    const putOptions = {
+      contentType,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: false,
+    };
 
-  return blob.url;
+    if (access === "public" || access === "private") {
+      putOptions.access = access;
+    }
+
+    const blob = await put(`rooms/${roomCode}/rounds/${roundId}/drawing.png`, buffer, putOptions);
+    return blob.url;
+  } catch {
+    // Keep the round playable even if the store access mode is misconfigured.
+    return fallbackDataUrl(contentType, base64Data);
+  }
 }
