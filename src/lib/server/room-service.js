@@ -1,9 +1,10 @@
 import { DEFAULT_CANVAS, ROOM_EVENT_TYPES, ROOM_STATUS, TOTAL_ROUNDS } from "@/lib/constants";
-import { uploadDrawingImage } from "@/lib/blob";
+import { buildDrawingSvg, uploadDrawingAssets } from "@/lib/blob";
 import { buildSummary, scoreRound } from "@/lib/scoring";
 import { generateRoomCode } from "@/lib/room-code";
 import { createRound } from "@/lib/round-engine";
 import { getRoom, saveRoom, appendRoomEvent, getRoomEvents, findRoomCodeByRoundId } from "@/lib/server/room-store";
+import { validateGuessPayload, validateIntentPayload } from "@/lib/validators";
 
 function now() {
   return Date.now();
@@ -161,6 +162,11 @@ export async function submitIntent(roundId, playerId, payload) {
     throw new Error("ONLY_DRAWER_CAN_SET_INTENT");
   }
 
+  const validationError = validateIntentPayload(payload, round.vibeOptions);
+  if (validationError) {
+    throw new Error("INVALID_INTENT_PAYLOAD");
+  }
+
   round.drawerIntent = payload;
   round.phase = "drawing";
 
@@ -214,18 +220,42 @@ export async function submitDrawing(roundId, playerId, payload) {
     throw new Error("ONLY_DRAWER_CAN_SUBMIT_DRAWING");
   }
 
-  const imageUrl = await uploadDrawingImage({
+  if (Array.isArray(payload.strokes)) {
+    round.strokes = payload.strokes;
+    round.drawing.strokeCount = payload.strokes.length;
+  }
+
+  const width = payload.width ?? DEFAULT_CANVAS.width;
+  const height = payload.height ?? DEFAULT_CANVAS.height;
+  const svgMarkup = buildDrawingSvg({
+    strokes: round.strokes,
+    width,
+    height,
+  });
+  const uploadedDrawing = await uploadDrawingAssets({
     roomCode: room.roomCode,
     roundId,
-    base64Data: payload.imageBase64,
-    contentType: payload.contentType || "image/png",
+    pngBase64Data: payload.imageBase64,
+    pngContentType: payload.contentType || "image/png",
+    svgMarkup,
   });
 
   round.drawing = {
     ...round.drawing,
-    imageUrl,
-    width: payload.width ?? DEFAULT_CANVAS.width,
-    height: payload.height ?? DEFAULT_CANVAS.height,
+    imageUrl: uploadedDrawing?.primary?.url ?? null,
+    imagePathname: uploadedDrawing?.primary?.pathname ?? null,
+    imageAccess: uploadedDrawing?.primary?.access ?? null,
+    imageStorage: uploadedDrawing?.primary?.storage ?? null,
+    pngUrl: uploadedDrawing?.png?.url ?? null,
+    pngPathname: uploadedDrawing?.png?.pathname ?? null,
+    pngAccess: uploadedDrawing?.png?.access ?? null,
+    pngStorage: uploadedDrawing?.png?.storage ?? null,
+    svgUrl: uploadedDrawing?.svg?.url ?? null,
+    svgPathname: uploadedDrawing?.svg?.pathname ?? null,
+    svgAccess: uploadedDrawing?.svg?.access ?? null,
+    svgStorage: uploadedDrawing?.svg?.storage ?? null,
+    width,
+    height,
     submittedAt: now(),
   };
   round.phase = "guessing";
@@ -233,7 +263,18 @@ export async function submitDrawing(roundId, playerId, payload) {
   return persistAndBroadcast(room, ROOM_EVENT_TYPES.ROUND_SUBMITTED, {
     roundId,
     phase: round.phase,
-    imageUrl,
+    imageUrl: round.drawing.imageUrl,
+    imagePathname: round.drawing.imagePathname,
+    imageAccess: round.drawing.imageAccess,
+    imageStorage: round.drawing.imageStorage,
+    pngUrl: round.drawing.pngUrl,
+    pngPathname: round.drawing.pngPathname,
+    pngAccess: round.drawing.pngAccess,
+    pngStorage: round.drawing.pngStorage,
+    svgUrl: round.drawing.svgUrl,
+    svgPathname: round.drawing.svgPathname,
+    svgAccess: round.drawing.svgAccess,
+    svgStorage: round.drawing.svgStorage,
   });
 }
 
@@ -243,6 +284,11 @@ export async function submitGuess(roundId, playerId, payload) {
 
   if (round.guesserPlayerId !== playerId) {
     throw new Error("ONLY_GUESSER_CAN_SUBMIT");
+  }
+
+  const validationError = validateGuessPayload(payload, round.vibeOptions);
+  if (validationError) {
+    throw new Error("INVALID_GUESS_PAYLOAD");
   }
 
   round.guesserAnswer = payload;

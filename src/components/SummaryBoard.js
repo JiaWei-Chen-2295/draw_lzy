@@ -1,7 +1,42 @@
 import Image from "next/image";
 
+function buildAssetSrc(url, pathname, access, storage) {
+  if (!url) {
+    return null;
+  }
+
+  if (storage !== "blob" || !pathname) {
+    return url;
+  }
+
+  if (access !== "private") {
+    return url;
+  }
+
+  const encodedPath = pathname
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  return `/api/blob/${encodedPath}?access=private`;
+}
+
+function buildDrawingAssets(drawing) {
+  const pngSrc = buildAssetSrc(drawing?.pngUrl || drawing?.imageUrl, drawing?.pngPathname || drawing?.imagePathname, drawing?.pngAccess || drawing?.imageAccess, drawing?.pngStorage || drawing?.imageStorage);
+  const svgSrc = buildAssetSrc(drawing?.svgUrl, drawing?.svgPathname, drawing?.svgAccess, drawing?.svgStorage);
+
+  return {
+    pngSrc,
+    svgSrc,
+    previewSrc: pngSrc || svgSrc,
+  };
+}
+
 export function SummaryBoard({ room }) {
-  const rounds = room.roundIds.map((roundId) => room.roundsById[roundId]);
+  const rounds = room.roundIds.map((roundId) => ({
+    ...room.roundsById[roundId],
+    drawingAssets: buildDrawingAssets(room.roundsById[roundId]?.drawing),
+  }));
   const summary = room.summary;
 
   return (
@@ -42,10 +77,10 @@ export function SummaryBoard({ room }) {
               <span className="pill text-xs text-slate-600">分数 {round.result?.score ?? 0}/2</span>
             </div>
 
-            {round.drawing?.imageUrl ? (
+            {round.drawingAssets.previewSrc ? (
               <div className="relative mt-5 aspect-square w-full overflow-hidden rounded-3xl border border-slate-200">
                 <Image
-                  src={round.drawing.imageUrl}
+                  src={round.drawingAssets.previewSrc}
                   alt={`第 ${round.roundIndex} 轮画作`}
                   fill
                   unoptimized
@@ -55,6 +90,21 @@ export function SummaryBoard({ room }) {
             ) : (
               <div className="mt-5 aspect-square w-full rounded-3xl border border-dashed border-slate-300 bg-white/50" />
             )}
+
+            {round.drawingAssets.pngSrc || round.drawingAssets.svgSrc ? (
+              <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                {round.drawingAssets.pngSrc ? (
+                  <a className="pill text-slate-600" href={round.drawingAssets.pngSrc} target="_blank" rel="noreferrer">
+                    查看 PNG
+                  </a>
+                ) : null}
+                {round.drawingAssets.svgSrc ? (
+                  <a className="pill text-slate-600" href={round.drawingAssets.svgSrc} target="_blank" rel="noreferrer">
+                    查看 SVG
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <div className="stat-card">

@@ -9,6 +9,8 @@ function OptionButton({ active, children, onClick }) {
 }
 
 export function GuessPicker({ round, value, onChange, onSubmit, isSubmitting }) {
+  const isComplete = Boolean(value.focusChoice && value.vibeChoice);
+
   return (
     <div className="space-y-5">
       <section className="panel p-5 md:p-6">
@@ -41,7 +43,7 @@ export function GuessPicker({ round, value, onChange, onSubmit, isSubmitting }) 
         </div>
       </section>
 
-      <button type="button" className="btn-primary w-full" onClick={onSubmit} disabled={isSubmitting}>
+      <button type="button" className="btn-primary w-full" onClick={onSubmit} disabled={isSubmitting || !isComplete}>
         {isSubmitting ? "提交中..." : "选好了，揭晓"}
       </button>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DrawingCanvas } from "@/components/DrawingCanvas";
 import { GuessPicker } from "@/components/GuessPicker";
@@ -53,6 +53,7 @@ export function RoomExperience({ roomCode }) {
   const [intent, setIntent] = useState({ focusChoice: "", vibeChoice: "" });
   const [guess, setGuess] = useState({ focusChoice: "", vibeChoice: "" });
   const [localDraft, setLocalDraft] = useState(null);
+  const pendingCanvasSyncRef = useRef(Promise.resolve());
 
   useEffect(() => {
     const restored = hydrateSession();
@@ -69,10 +70,8 @@ export function RoomExperience({ roomCode }) {
     }
 
     initRealtime(roomCode, session.playerId).catch(() => null);
-    const heartbeat = window.setInterval(() => refreshRoom(roomCode).catch(() => null), 2500);
 
     return () => {
-      window.clearInterval(heartbeat);
       cleanupRealtime();
     };
   }, [cleanupRealtime, initRealtime, refreshRoom, roomCode, session?.playerId, session?.roomCode]);
@@ -144,45 +143,61 @@ export function RoomExperience({ roomCode }) {
     return nextStrokes;
   }
 
+  function enqueueCanvasSync(task) {
+    const nextSync = pendingCanvasSyncRef.current
+      .catch(() => null)
+      .then(task);
+
+    pendingCanvasSyncRef.current = nextSync.catch(() => null);
+    return nextSync;
+  }
+
   async function handleStrokeCommitted(stroke) {
     applyOptimisticStrokes((currentStrokes) => [...currentStrokes, stroke]);
 
-    const response = await fetch("/api/realtime/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        roomCode,
-        eventType: "stroke.created",
-        payload: { roundId: currentRound.roundId, stroke },
-      }),
-    });
+    await enqueueCanvasSync(async () => {
+      const response = await fetch("/api/realtime/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          eventType: "stroke.created",
+          payload: { roundId: currentRound.roundId, stroke },
+        }),
+      });
 
-    if (!response.ok) {
-      await refreshRoom(roomCode);
-    }
+      if (!response.ok) {
+        await refreshRoom(roomCode);
+      }
+    });
   }
 
   async function handleReplaceStrokes(strokes) {
     applyOptimisticStrokes(strokes);
 
-    const response = await fetch("/api/realtime/publish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        roomCode,
-        eventType: strokes.length === 0 ? "canvas.cleared" : "canvas.replaceAllStrokes",
-        payload: { roundId: currentRound.roundId, strokes },
-      }),
-    });
+    await enqueueCanvasSync(async () => {
+      const response = await fetch("/api/realtime/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          eventType: strokes.length === 0 ? "canvas.cleared" : "canvas.replaceAllStrokes",
+          payload: { roundId: currentRound.roundId, strokes },
+        }),
+      });
 
-    if (!response.ok) {
-      await refreshRoom(roomCode);
-    }
+      if (!response.ok) {
+        await refreshRoom(roomCode);
+      }
+    });
   }
 
   async function handleSubmitDrawing(payload) {
+    await pendingCanvasSyncRef.current.catch(() => null);
+
     await postAndApply(`/api/rounds/${currentRound.roundId}/submit-drawing`, {
       playerId: session.playerId,
+      strokes: displayedStrokes,
       ...payload,
     });
   }

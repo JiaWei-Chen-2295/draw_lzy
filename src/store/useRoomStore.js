@@ -48,14 +48,26 @@ export const useRoomStore = create((set, get) => ({
     set({ error: null });
   },
 
-  async refreshRoom(roomCode) {
-    set({ isLoading: true, error: null });
+  async refreshRoom(roomCode, options = {}) {
+    const { silent = false } = options;
+
+    if (!silent) {
+      set({ isLoading: true, error: null });
+    }
+
     try {
       const data = await getJson(`/api/rooms/${roomCode}`);
-      set({ room: data.room, isLoading: false });
+      set((state) => ({
+        room: data.room,
+        isLoading: silent ? state.isLoading : false,
+        error: silent ? state.error : null,
+      }));
       return data.room;
     } catch (error) {
-      set({ isLoading: false, error: error.message });
+      set((state) => ({
+        isLoading: silent ? state.isLoading : false,
+        error: error.message,
+      }));
       throw error;
     }
   },
@@ -91,7 +103,7 @@ export const useRoomStore = create((set, get) => ({
     const adapter = createRealtimeAdapter({ roomCode, playerId });
     await adapter.connect(roomCode, playerId);
     const unsubscribe = adapter.subscribeToRoomEvents(roomCode, () => {
-      get().refreshRoom(roomCode).catch(() => null);
+      get().refreshRoom(roomCode, { silent: true }).catch(() => null);
     });
 
     set({

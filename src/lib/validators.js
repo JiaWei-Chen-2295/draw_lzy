@@ -39,3 +39,15 @@ export function validateIntentPayload(payload, vibeOptions) {
 
   return null;
 }
+
+export function validateGuessPayload(payload, vibeOptions) {
+  if (!payload || !FOCUS_OPTIONS.includes(payload.focusChoice)) {
+    return "先选你觉得这张画更像在说什么";
+  }
+
+  if (!payload.vibeChoice || !vibeOptions.includes(payload.vibeChoice)) {
+    return "再选一个你觉得最接近的感觉";
+  }
+
+  return null;
+}

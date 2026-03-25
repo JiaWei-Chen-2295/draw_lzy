@@ -9,6 +9,8 @@ const ERROR_MESSAGES = {
   ROOM_FINISHED: "这一局已经结束啦",
   GAME_COMPLETE: "六轮已经都走完了",
   ROUND_NOT_FOUND: "这一轮好像还没准备好",
+  INVALID_INTENT_PAYLOAD: "这一步还没选完整，先把两个选项都选上",
+  INVALID_GUESS_PAYLOAD: "这一步还没选完整，先把两个选项都选上",
   ONLY_DRAWER_CAN_SET_INTENT: "这一段只有作画的人能先定答案",
   ONLY_DRAWER_CAN_SUBMIT_DRAWING: "完成作画这一步需要作画者来提交",
   ONLY_GUESSER_CAN_SUBMIT: "这一步留给猜的人来选",
