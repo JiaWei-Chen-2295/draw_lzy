@@ -20,20 +20,19 @@ function WaitingCard({ title, body }) {
   );
 }
 
-function mergeStrokes(serverStrokes = [], localStrokes = []) {
-  const seen = new Set();
-  const merged = [];
+function getStrokeIds(strokes = []) {
+  return strokes.map((stroke) => stroke?.strokeId).filter(Boolean);
+}
 
-  [...serverStrokes, ...localStrokes].forEach((stroke) => {
-    if (!stroke?.strokeId || seen.has(stroke.strokeId)) {
-      return;
-    }
+function areStrokeListsEqual(left = [], right = []) {
+  const leftIds = getStrokeIds(left);
+  const rightIds = getStrokeIds(right);
 
-    seen.add(stroke.strokeId);
-    merged.push(stroke);
-  });
+  if (leftIds.length !== rightIds.length) {
+    return false;
+  }
 
-  return merged;
+  return leftIds.every((strokeId, index) => strokeId === rightIds[index]);
 }
 
 export function RoomExperience({ roomCode }) {
@@ -90,17 +89,29 @@ export function RoomExperience({ roomCode }) {
   const isDrawer = currentRound?.drawerPlayerId === session?.playerId;
   const isGuesser = currentRound?.guesserPlayerId === session?.playerId;
   const isGameFinished = room?.status === "finished";
+  const activeLocalDraft = useMemo(() => {
+    if (!currentRound || !localDraft || localDraft.roundId !== currentRound.roundId) {
+      return null;
+    }
+
+    if (areStrokeListsEqual(currentRound.strokes ?? [], localDraft.strokes ?? [])) {
+      return null;
+    }
+
+    return localDraft;
+  }, [currentRound, localDraft]);
+
   const displayedStrokes = useMemo(() => {
     if (!currentRound) {
       return [];
     }
 
-    if (!localDraft || localDraft.roundId !== currentRound.roundId) {
+    if (!isDrawer || !activeLocalDraft) {
       return currentRound.strokes ?? [];
     }
 
-    return mergeStrokes(currentRound.strokes ?? [], localDraft.strokes ?? []);
-  }, [currentRound, localDraft]);
+    return activeLocalDraft.strokes ?? [];
+  }, [activeLocalDraft, currentRound, isDrawer]);
 
   async function handleStartGame() {
     clearError();
@@ -117,20 +128,24 @@ export function RoomExperience({ roomCode }) {
     });
   }
 
-  function applyOptimisticStrokes(nextStrokes) {
+  function applyOptimisticStrokes(updater) {
     if (!currentRound) {
-      return;
+      return [];
     }
+
+    const baseStrokes = activeLocalDraft?.strokes ?? currentRound.strokes ?? [];
+    const nextStrokes = typeof updater === "function" ? updater(baseStrokes) : updater;
 
     setLocalDraft({
       roundId: currentRound.roundId,
       strokes: nextStrokes,
     });
+
+    return nextStrokes;
   }
 
   async function handleStrokeCommitted(stroke) {
-    const optimisticStrokes = [...(currentRound.strokes ?? []), stroke];
-    applyOptimisticStrokes(optimisticStrokes);
+    applyOptimisticStrokes((currentStrokes) => [...currentStrokes, stroke]);
 
     const response = await fetch("/api/realtime/publish", {
       method: "POST",
