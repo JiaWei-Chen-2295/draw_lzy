@@ -15,11 +15,11 @@ export function SummaryBoard({ room }) {
             <div className="mt-2 text-3xl font-semibold">{summary?.totalRounds ?? rounds.length}</div>
           </div>
           <div className="stat-card">
-            <div className="text-sm text-slate-500">Focus 命中</div>
+            <div className="text-sm text-slate-500">第一题对上的次数</div>
             <div className="mt-2 text-3xl font-semibold">{summary?.focusHits ?? 0}</div>
           </div>
           <div className="stat-card">
-            <div className="text-sm text-slate-500">Vibe 命中</div>
+            <div className="text-sm text-slate-500">第二题对上的次数</div>
             <div className="mt-2 text-3xl font-semibold">{summary?.vibeHits ?? 0}</div>
           </div>
           <div className="stat-card">
@@ -63,7 +63,7 @@ export function SummaryBoard({ room }) {
                 <div className="text-sm text-slate-600">{round.drawerIntent?.vibeChoice || "-"}</div>
               </div>
               <div className="stat-card">
-                <div className="text-sm text-slate-500">对方猜的是</div>
+                <div className="text-sm text-slate-500">后来猜的是</div>
                 <div className="mt-2 text-base font-semibold">{round.guesserAnswer?.focusChoice || "-"}</div>
                 <div className="text-sm text-slate-600">{round.guesserAnswer?.vibeChoice || "-"}</div>
               </div>

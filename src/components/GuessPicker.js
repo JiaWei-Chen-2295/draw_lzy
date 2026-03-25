@@ -12,7 +12,7 @@ export function GuessPicker({ round, value, onChange, onSubmit, isSubmitting }) 
   return (
     <div className="space-y-5">
       <section className="panel p-5 md:p-6">
-        <h3 className="text-lg font-semibold">你先猜一个，这张画更像在说什么？</h3>
+        <h3 className="text-lg font-semibold">你觉得这张画更像在说哪一边？</h3>
         <div className="option-grid mt-4 sm:grid-cols-2">
           {FOCUS_OPTIONS.map((option) => (
             <OptionButton
@@ -27,7 +27,7 @@ export function GuessPicker({ round, value, onChange, onSubmit, isSubmitting }) 
       </section>
 
       <section className="panel p-5 md:p-6">
-        <h3 className="text-lg font-semibold">再猜一种感觉</h3>
+        <h3 className="text-lg font-semibold">再选一个你觉得最接近的感觉</h3>
         <div className="option-grid mt-4 sm:grid-cols-2">
           {round.vibeOptions.map((option) => (
             <OptionButton
@@ -42,7 +42,7 @@ export function GuessPicker({ round, value, onChange, onSubmit, isSubmitting }) 
       </section>
 
       <button type="button" className="btn-primary w-full" onClick={onSubmit} disabled={isSubmitting}>
-        {isSubmitting ? "提交中..." : "交卷看看"}
+        {isSubmitting ? "提交中..." : "选好了，揭晓"}
       </button>
     </div>
   );

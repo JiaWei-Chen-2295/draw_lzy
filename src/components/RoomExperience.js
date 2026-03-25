@@ -250,7 +250,7 @@ export function RoomExperience({ roomCode }) {
             isDrawer ? (
               <IntentPicker round={currentRound} value={intent} onChange={setIntent} onSubmit={handleIntentSubmit} isSubmitting={isLoading} />
             ) : (
-              <WaitingCard title="对方正在先想一个方向" body="这一步只有作画者看得到。你先别急，等他把心里的答案定下来。" />
+              <WaitingCard title="对方先选一下这轮想画什么感觉" body="这一步只有作画的人看得到，等他选好就会开始画。" />
             )
           ) : null}
 
@@ -266,7 +266,7 @@ export function RoomExperience({ roomCode }) {
               />
             ) : (
               <div className="space-y-4">
-                <WaitingCard title="你可以看到画面在慢慢长出来" body="这一轮你先当观察者，等对方画完，你再做选择题。" />
+                <WaitingCard title="先看着这张画慢慢长出来" body="等对方画完，这一轮就轮到你来选答案。" />
                 <DrawingCanvas round={currentRound} strokes={displayedStrokes} readOnly />
               </div>
             )
@@ -279,7 +279,7 @@ export function RoomExperience({ roomCode }) {
                 <GuessPicker round={currentRound} value={guess} onChange={setGuess} onSubmit={handleGuessSubmit} isSubmitting={isLoading} />
               </div>
             ) : (
-              <WaitingCard title="轮到对方来猜了" body="先等他选完，我们马上揭晓这一轮。" />
+              <WaitingCard title="轮到对方来选了" body="等他选完，这一轮就会马上揭晓。" />
             )
           ) : null}
 

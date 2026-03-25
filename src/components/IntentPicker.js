@@ -12,7 +12,7 @@ export function IntentPicker({ round, value, onChange, onSubmit, isSubmitting })
   return (
     <div className="space-y-5">
       <section className="panel p-5 md:p-6">
-        <h3 className="text-lg font-semibold">1. 这张画更像在说什么？</h3>
+        <h3 className="text-lg font-semibold">先选一下，这张画你想让对方猜到哪一边？</h3>
         <div className="option-grid mt-4 sm:grid-cols-2">
           {FOCUS_OPTIONS.map((option) => (
             <OptionButton
@@ -27,7 +27,7 @@ export function IntentPicker({ round, value, onChange, onSubmit, isSubmitting })
       </section>
 
       <section className="panel p-5 md:p-6">
-        <h3 className="text-lg font-semibold">2. 这张画更接近哪一种感觉？</h3>
+        <h3 className="text-lg font-semibold">再选一个最接近的感觉</h3>
         <div className="option-grid mt-4 sm:grid-cols-2">
           {round.vibeOptions.map((option) => (
             <OptionButton
@@ -42,7 +42,7 @@ export function IntentPicker({ round, value, onChange, onSubmit, isSubmitting })
       </section>
 
       <button type="button" className="btn-primary w-full" onClick={onSubmit} disabled={isSubmitting}>
-        {isSubmitting ? "先记一下..." : "定好了，去画吧"}
+        {isSubmitting ? "先记一下..." : "选好了，开始画"}
       </button>
     </div>
   );

@@ -9,7 +9,7 @@ export default function HomePage() {
             <p className="text-xs uppercase tracking-[0.4em] text-slate-500">ANY DOOR</p>
             <h1 className="mt-4 max-w-xl text-5xl font-semibold tracking-tight text-slate-900 md:text-7xl">任意门</h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-              画的不是东西，是最近、现在，和一点点接下来。两个人，两台设备，轮流用抽象图形看看你们有没有想到一块去。
+              画的不是东西，是现在、最近，还有一点点接下来。两个人，两台设备，轮流用颜色和线条猜彼此想表达的感觉。
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -29,7 +29,7 @@ export default function HomePage() {
             </div>
             <div className="stat-card">
               <div className="text-sm text-slate-500">玩法感受</div>
-              <div className="mt-2 text-xl font-semibold text-slate-900">轻一点，别太具体，看看偏差</div>
+              <div className="mt-2 text-xl font-semibold text-slate-900">轻松一点，别画太具体，看看有没有猜中</div>
             </div>
             <div className="stat-card">
               <div className="text-sm text-slate-500">适合现在</div>
