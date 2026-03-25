@@ -43,7 +43,7 @@ export default function JoinPage() {
   }
 
   return (
-    <main className="app-shell flex flex-1 items-center justify-center">
+    <main className="app-shell page-screen flex flex-1 items-center justify-center">
       <form onSubmit={handleSubmit} className="panel w-full max-w-xl p-6 md:p-8">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-500">JOIN ROOM</p>
         <h1 className="mt-3 text-3xl font-semibold text-slate-900">带上房间码进来</h1>

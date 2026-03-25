@@ -1,9 +1,9 @@
 import { DEFAULT_CANVAS, ROOM_EVENT_TYPES, ROOM_STATUS, TOTAL_ROUNDS } from "@/lib/constants";
-import { buildDrawingSvg, uploadDrawingAssets } from "@/lib/blob";
+import { buildDrawingSvg, readArchiveIndex, readRoomArchive, uploadDrawingAssets, uploadRoomAnalysisSnapshot, upsertArchiveIndexEntry } from "@/lib/blob";
 import { buildSummary, scoreRound } from "@/lib/scoring";
 import { generateRoomCode } from "@/lib/room-code";
 import { createRound } from "@/lib/round-engine";
-import { getRoom, saveRoom, appendRoomEvent, getRoomEvents, findRoomCodeByRoundId } from "@/lib/server/room-store";
+import { getRoom, saveRoom, appendRoomEvent, getRoomEvents, findRoomCodeByRoundId, listRooms } from "@/lib/server/room-store";
 import { validateGuessPayload, validateIntentPayload } from "@/lib/validators";
 
 function now() {
@@ -62,12 +62,50 @@ async function persistAndBroadcast(room, eventType, payload) {
     payload,
     createdAt: now(),
   });
+  await persistAnalysisSnapshot(room, { snapshotType: "latest" });
   return cloneRoom(room);
+}
+
+async function persistAnalysisSnapshot(room, { snapshotType = "latest" } = {}) {
+  const { events } = await getRoomEvents(room.roomCode, 0);
+  const analysisAsset = await uploadRoomAnalysisSnapshot({ room, events, snapshotType });
+
+  if (!analysisAsset) {
+    return;
+  }
+
+  room.analysis = room.analysis ?? {};
+  room.analysis[snapshotType] = {
+    snapshotUrl: analysisAsset.snapshot?.url ?? null,
+    snapshotPathname: analysisAsset.snapshot?.pathname ?? null,
+    snapshotAccess: analysisAsset.snapshot?.access ?? null,
+    snapshotStorage: analysisAsset.snapshot?.storage ?? null,
+    snapshotContentType: analysisAsset.snapshot?.contentType ?? null,
+    exportedAt: analysisAsset.exportedAt,
+  };
+
+  if (snapshotType === "final") {
+    const archiveIndex = await upsertArchiveIndexEntry({
+      room,
+      exportedAt: analysisAsset.exportedAt,
+      snapshot: analysisAsset.snapshot,
+    });
+
+    room.analysis.archiveIndex = {
+      pathname: archiveIndex?.asset?.pathname ?? null,
+      access: archiveIndex?.asset?.access ?? null,
+      storage: archiveIndex?.asset?.storage ?? null,
+      exportedAt: analysisAsset.exportedAt,
+    };
+  }
+
+  await saveRoom(room);
 }
 
 export async function createRoom(nickname) {
   const room = createEmptyRoom(nickname);
   await saveRoom(room);
+  await persistAnalysisSnapshot(room, { snapshotType: "latest" });
   return {
     room: cloneRoom(room),
     playerId: room.players[0].playerId,
@@ -104,7 +142,63 @@ export async function joinRoom(roomCode, nickname) {
 
 export async function readRoom(roomCode) {
   const room = await getRoom(roomCode);
-  return room ? cloneRoom(room) : null;
+  if (room) {
+    return cloneRoom(room);
+  }
+
+  const archive = await readRoomArchive(roomCode);
+  if (!archive?.room) {
+    return null;
+  }
+
+  const archivedRoom = cloneRoom(archive.room);
+  archivedRoom.analysis = archivedRoom.analysis ?? {};
+  archivedRoom.analysis.final = archivedRoom.analysis.final ?? {
+    snapshotUrl: null,
+    snapshotPathname: `rooms/${roomCode}/analysis/final.json`,
+    snapshotAccess: process.env.BLOB_ACCESS === "private" ? "private" : "public",
+    snapshotStorage: process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "inline",
+    snapshotContentType: "application/json",
+    exportedAt: archive.exportedAt ?? archivedRoom.updatedAt ?? null,
+  };
+
+  return archivedRoom;
+}
+
+export async function readRooms() {
+  const rooms = await listRooms();
+  const archiveRooms = await readArchiveIndex();
+  const liveRoomCodes = new Set(rooms.map((room) => room?.roomCode).filter(Boolean));
+  const mergedRooms = [
+    ...rooms,
+    ...archiveRooms
+      .filter((entry) => entry?.roomCode && !liveRoomCodes.has(entry.roomCode))
+      .map((entry) => ({
+        roomCode: entry.roomCode,
+        status: entry.status,
+        players: entry.players ?? [],
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+        totalRounds: entry.totalRounds,
+        roundIds: Array.from({ length: entry.roundCount ?? 0 }, (_, index) => `archived-round-${index + 1}`),
+        roundsById: {},
+        currentRoundId: null,
+        analysis: {
+          final: {
+            snapshotUrl: entry.snapshotUrl,
+            snapshotPathname: entry.snapshotPathname,
+            snapshotAccess: entry.snapshotAccess,
+            snapshotStorage: entry.snapshotStorage,
+            snapshotContentType: entry.snapshotContentType,
+            exportedAt: entry.exportedAt,
+          },
+        },
+      })),
+  ];
+
+  return mergedRooms
+    .map((room) => cloneRoom(room))
+    .sort((left, right) => (right?.updatedAt ?? 0) - (left?.updatedAt ?? 0));
 }
 
 export async function startRoom(roomCode, playerId) {
@@ -312,11 +406,17 @@ export async function revealRound(roundId) {
     room.summary = buildSummary(room, room.roundIds.map((item) => room.roundsById[item]));
   }
 
-  return persistAndBroadcast(room, isGameFinished ? ROOM_EVENT_TYPES.GAME_FINISHED : ROOM_EVENT_TYPES.ROUND_REVEALED, {
+  const nextRoom = await persistAndBroadcast(room, isGameFinished ? ROOM_EVENT_TYPES.GAME_FINISHED : ROOM_EVENT_TYPES.ROUND_REVEALED, {
     roundId,
     result: round.result,
     summary: room.summary,
   });
+
+  if (isGameFinished) {
+    await persistAnalysisSnapshot(room, { snapshotType: "final" });
+  }
+
+  return nextRoom;
 }
 
 export async function updatePresence(roomCode, playerId, payload) {
@@ -345,6 +445,7 @@ export async function updatePresence(roomCode, playerId, payload) {
     },
     createdAt: now(),
   });
+  await persistAnalysisSnapshot(room, { snapshotType: "latest" });
 
   return cloneRoom(room);
 }

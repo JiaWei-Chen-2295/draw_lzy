@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="app-shell flex flex-1 items-center">
+    <main className="app-shell page-screen flex flex-1 items-center">
       <section className="panel grain relative overflow-hidden px-6 py-10 md:px-10 md:py-12">
         <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div>
@@ -18,6 +18,9 @@ export default function HomePage() {
               </Link>
               <Link href="/join" className="btn-secondary">
                 加入房间
+              </Link>
+              <Link href="/admin" className="btn-ghost">
+                管理回放
               </Link>
             </div>
           </div>

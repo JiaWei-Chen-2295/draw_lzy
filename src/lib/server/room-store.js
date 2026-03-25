@@ -7,6 +7,8 @@ function createMemoryState() {
   };
 }
 
+const ROOM_INDEX_KEY = "rooms:index";
+
 function getMemoryState() {
   if (!globalThis.__ANY_DOOR_MEMORY__) {
     globalThis.__ANY_DOOR_MEMORY__ = createMemoryState();
@@ -39,9 +41,11 @@ export async function saveRoom(room) {
   const redis = getRedis();
   if (redis) {
     await redis.set(`room:${room.roomCode}`, room, { ex: 60 * 60 * 24 });
-    room.roundIds?.forEach(async (roundId) => {
-      await redis.set(`round:${roundId}:roomCode`, room.roomCode, { ex: 60 * 60 * 24 });
-    });
+    await redis.sadd(ROOM_INDEX_KEY, room.roomCode);
+    await redis.expire(ROOM_INDEX_KEY, 60 * 60 * 24);
+    await Promise.all(
+      (room.roundIds ?? []).map((roundId) => redis.set(`round:${roundId}:roomCode`, room.roomCode, { ex: 60 * 60 * 24 })),
+    );
     return room;
   }
 
@@ -96,4 +100,15 @@ export async function findRoomCodeByRoundId(roundId) {
   }
 
   return null;
+}
+
+export async function listRooms() {
+  const redis = getRedis();
+  if (redis) {
+    const roomCodes = ((await redis.smembers(ROOM_INDEX_KEY)) ?? []).filter(Boolean);
+    const rooms = await Promise.all(roomCodes.map((roomCode) => redis.get(`room:${roomCode}`)));
+    return rooms.filter(Boolean);
+  }
+
+  return Array.from(getMemoryState().rooms.values()).map((room) => structuredClone(room));
 }

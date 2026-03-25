@@ -71,6 +71,7 @@ Room 是当前实现的聚合根，包含：
 - `roundIds`
 - `roundsById`
 - `summary`
+- `analysis`
 
 ### 4.2 Round
 
@@ -101,6 +102,14 @@ Stroke 是实时同步的最小单位，不逐点发送。
 - `size`
 - `points`
 - `createdAt`
+- `startedAt`
+- `endedAt`
+- `durationMs`
+
+其中 `points[]` 内的每个点除了 `x/y` 外，还会记录：
+
+- `t`
+- `pressure`
 
 ## 5. 服务端实现
 
@@ -133,6 +142,23 @@ Stroke 是实时同步的最小单位，不逐点发送。
 
 当前实现没有严格防重/幂等控制，也没有复杂状态机库，优先保证 MVP 跑通。
 
+### 5.3 分析归档
+
+服务端会在关键状态变更后同步维护分析快照：
+
+- 过程态持续刷新 `latest.json`
+- 房间结束时固化 `final.json`
+- 同步更新 Blob 中的 `analysis/archive-index.json`
+
+这层归档的目的不是替代实时 room store，而是为：
+
+- 后台房间列表
+- 历史回放
+- 离线分析
+- 后续派生能力
+
+提供长期可读的数据底座。
+
 ## 6. API 设计
 
 API 基本对应规格中的业务动作。
@@ -143,6 +169,7 @@ API 基本对应规格中的业务动作。
 - `POST /api/rooms/join`
 - `POST /api/rooms/start`
 - `GET /api/rooms/[roomCode]`
+- `GET /api/admin/rooms`
 
 ### 回合相关
 
@@ -200,6 +227,15 @@ API 基本对应规格中的业务动作。
 - GuessPicker
 - RevealCard
 
+### 7.3 Admin 后台
+
+当前新增了两层后台页面：
+
+- `/admin`：展示所有房间、玩家、状态、创建时间、更新时间与当前轮次
+- `/admin/[roomCode]`：查看该房间完整历史与逐轮回放
+
+后台详情页优先读取实时 room；如果实时存储已过期，则退回 Blob 中的 `final.json` 归档。
+
 ## 8. Canvas 实现
 
 画布逻辑在 [DrawingCanvas.js](/D:/a_my_project/draw_lzy/src/components/DrawingCanvas.js)。
@@ -211,6 +247,15 @@ API 基本对应规格中的业务动作。
 - `pointerdown` 开始缓存 points
 - `pointermove` 直接在本地 canvas 上画线
 - `pointerup` 生成完整 stroke 并通知上层提交
+
+为了支持手写感回放，当前会在本地录制：
+
+- 落笔时间 `startedAt`
+- 抬笔时间 `endedAt`
+- 每个采样点的时间 `t`
+- 可用时记录 pointer pressure
+
+这样仍然保持“按 stroke 同步”，但一笔内部已经带完整运笔轨迹。
 
 这样用户不会感觉每一笔都依赖网络确认。
 
@@ -251,6 +296,17 @@ API 基本对应规格中的业务动作。
 - 通过 `canvas.replaceAllStrokes` 同步整份列表
 
 这是 MVP 下实现最稳妥、最容易对齐双端画面的方案。
+
+### 8.5 录制与重放
+
+揭晓阶段新增了手写回放画布：
+
+- 读取 stroke 内部的时间序列
+- 按落笔先后和每个点的 `t` 逐步重绘
+- 保留从起笔、运笔到收笔的完整过程
+- 支持暂停、继续、重新播放和拖动进度条
+
+这层能力不改变服务端实时同步粒度，只扩展 stroke 的表现力。
 
 ## 9. 实时同步实现
 
@@ -330,6 +386,25 @@ Blob 上传在 [blob.js](/D:/a_my_project/draw_lzy/src/lib/blob.js)。
 
 这是故意做的稳定性兜底，因为 MVP 的目标是先保证一局能完整走完。
 
+目前 Blob 中有三类主要归档：
+
+1. 画作资产
+   - `drawing.png`
+   - `drawing.svg`
+2. 分析快照
+   - `rooms/{roomCode}/analysis/latest.json`
+   - `rooms/{roomCode}/analysis/final.json`
+3. 全局归档索引
+   - `analysis/archive-index.json`
+
+分析快照内会写入：
+
+- `schemaVersion`
+- `snapshotType`
+- `room`
+- `events`
+- `stats`
+
 ### 10.4 Private Blob 的边界
 
 如果 Blob store 是 private：
@@ -341,6 +416,7 @@ Blob 上传在 [blob.js](/D:/a_my_project/draw_lzy/src/lib/blob.js)。
 后续如果要正式使用 private store，建议补：
 
 - 服务端代理读取
+- 管理员鉴权
 - 或带签名的临时访问 URL
 
 ## 11. 会话恢复
@@ -421,7 +497,12 @@ summary 当前包含：
 
 ### 14.2 `saveRoom` 中 round 索引写入方式较粗糙
 
-当前 `room.roundIds.forEach(async ...)` 没有聚合等待，MVP 下问题不大，但更严谨的实现应该改成显式 `Promise.all`。
+这项问题已处理，当前 Redis round 索引写入已改成显式 `Promise.all`。
+
+当前剩余风险更多在于：
+
+- room 数据与 archive-index 之间还不是事务式提交
+- Blob 归档更新失败时没有单独重试队列
 
 ### 14.3 Redis 事件流没有裁剪策略细化
 
@@ -437,15 +518,19 @@ summary 当前包含：
 
 1. 把实时层升级为真正的推送通道
 2. 强化服务端 phase 校验和幂等保护
-3. 把 Redis 写路径整理为更稳定的事务式风格
-4. 补 private Blob 的可读方案
-5. 把 summary 结构扩展成礼物页可复用的数据源
+3. 给 Blob 归档补重试 / 校验 / 管理员鉴权
+4. 把 Redis 与 Blob 写路径整理为更稳定的事务式风格
+5. 把 summary 结构扩展成礼物页与分析层可复用的数据源
 
 ## 16. 关键文件索引
 
 - 页面入口：[src/app/page.js](/D:/a_my_project/draw_lzy/src/app/page.js)
+- 后台列表：[src/components/AdminRoomsClient.js](/D:/a_my_project/draw_lzy/src/components/AdminRoomsClient.js)
+- 后台详情：[src/components/AdminReplayClient.js](/D:/a_my_project/draw_lzy/src/components/AdminReplayClient.js)
 - 房间流程：[src/components/RoomExperience.js](/D:/a_my_project/draw_lzy/src/components/RoomExperience.js)
 - 画布实现：[src/components/DrawingCanvas.js](/D:/a_my_project/draw_lzy/src/components/DrawingCanvas.js)
+- 回放实现：[src/components/StrokeReplayCanvas.js](/D:/a_my_project/draw_lzy/src/components/StrokeReplayCanvas.js)
+- 笔迹播放器：[src/lib/stroke-player.js](/D:/a_my_project/draw_lzy/src/lib/stroke-player.js)
 - 回合服务：[src/lib/server/room-service.js](/D:/a_my_project/draw_lzy/src/lib/server/room-service.js)
 - 房间存储：[src/lib/server/room-store.js](/D:/a_my_project/draw_lzy/src/lib/server/room-store.js)
 - 实时适配器：[src/lib/realtime-adapter.js](/D:/a_my_project/draw_lzy/src/lib/realtime-adapter.js)

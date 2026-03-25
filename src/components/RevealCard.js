@@ -35,7 +35,6 @@ export function RevealCard({ round, isGameFinished, onContinue, disabled }) {
           </span>
         </div>
       </div>
-
       <button type="button" className="btn-primary mt-6 w-full" onClick={onContinue} disabled={disabled}>
         {isGameFinished ? "去看回顾页" : "下一轮"}
       </button>

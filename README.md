@@ -16,6 +16,10 @@
 - 固定 6 轮流程
 - 作画者先做隐藏选择
 - Canvas 作画、逐笔同步、撤销、清空
+- 手写轨迹录制与揭晓阶段重放
+- Admin 后台查看房间列表、时间信息与历史回放
+- 房间历史与事件流自动导出 JSON 到 Vercel Blob
+- 房间结束后会固化 `final.json`，并写入 Blob 归档索引
 - 猜测者双选择题作答
 - 揭晓结果与基础 summary
 - localStorage 会话恢复
@@ -71,6 +75,13 @@ npm run dev
 
 默认访问 [http://localhost:3000](http://localhost:3000)。
 
+如需查看整局所有画作的回放管理页，可访问：
+
+```txt
+/admin
+/admin/房间码
+```
+
 ## 常用命令
 
 ```bash
@@ -102,7 +113,8 @@ specs/
 - 不做关系定义类题目，不引导“我们之间是什么”
 - 猜测者只做选择题，不做自由输入
 - 实时同步粒度是 stroke，不是 point
-- Blob 只做归档，不负责实时同步
+- 每个 stroke 内部会记录从落笔到抬笔的轨迹时间序列，用于手写回放
+- Blob 只做归档、分析快照和后台长期索引，不负责实时同步
 
 ## 当前实现取舍
 
@@ -110,11 +122,12 @@ specs/
 - 房间内主流程集中在一个路由 `/room/[roomCode]`
 - Canvas 优先本地绘制，再异步同步到服务端
 - Blob 上传失败时会退回 data URL，保证流程不中断
+- 长期历史优先依赖 Blob 归档，实时协作优先依赖 Redis / memory room store
 
 ## 已知限制
 
 - `tmp-app/` 是早期脚手架残留目录，已被 `.gitignore` 忽略，但最好后续手动清理
-- private Blob store 下虽然可上传，但如果后续要长期稳定展示归档图片，建议补服务端签名读取方案
+- private Blob store 下虽然已补服务端代理读取，但如果后续要做更细粒度权限控制，建议补管理员鉴权
 - 目前 Redis 读写使用 Upstash REST 变量，`REDIS_URL` 还未直接接入业务逻辑
 
 ## 验证状态

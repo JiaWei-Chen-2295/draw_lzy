@@ -1,38 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { StrokeReplayCanvas } from "@/components/StrokeReplayCanvas";
+import { drawStroke, normalizeStrokes, redrawCanvas } from "@/lib/stroke-player";
 
 const COLORS = ["#22313f", "#f07f6a", "#7ea79b", "#d7a34d", "#7b8cb8"];
-
-function drawStroke(context, stroke) {
-  if (!stroke?.points?.length) {
-    return;
-  }
-
-  context.save();
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.lineWidth = stroke.size;
-  context.strokeStyle = stroke.tool === "eraser" ? "#fff9f0" : stroke.color;
-  context.globalCompositeOperation = stroke.tool === "eraser" ? "destination-out" : "source-over";
-  context.beginPath();
-  const [firstPoint, ...restPoints] = stroke.points;
-  context.moveTo(firstPoint.x, firstPoint.y);
-  restPoints.forEach((point) => context.lineTo(point.x, point.y));
-  if (stroke.points.length === 1) {
-    context.lineTo(firstPoint.x + 0.01, firstPoint.y + 0.01);
-  }
-  context.stroke();
-  context.restore();
-}
-
-function redrawCanvas(canvas, strokes) {
-  const context = canvas.getContext("2d");
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#fff9f0";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  strokes.forEach((stroke) => drawStroke(context, stroke));
-}
 
 export function DrawingCanvas({
   round,
@@ -46,13 +18,16 @@ export function DrawingCanvas({
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
   const pointsRef = useRef([]);
+  const strokeStartRef = useRef(null);
   const renderedStrokeIdsRef = useRef([]);
   const renderedRoundIdRef = useRef(null);
   const [tool, setTool] = useState("pen");
   const [color, setColor] = useState(COLORS[0]);
   const [size, setSize] = useState(8);
+  const [displayMode, setDisplayMode] = useState("canvas");
 
-  const preparedStrokes = useMemo(() => strokes ?? [], [strokes]);
+  const preparedStrokes = useMemo(() => normalizeStrokes(strokes ?? []), [strokes]);
+  const canReplay = readOnly && preparedStrokes.length > 0;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -96,11 +71,13 @@ export function DrawingCanvas({
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
+    const fallbackPressure = event.pointerType === "mouse" ? 0.52 : 0.72;
 
     return {
       x: (event.clientX - rect.left) * scaleX,
       y: (event.clientY - rect.top) * scaleY,
       t: Date.now(),
+      pressure: Number.isFinite(event.pressure) && event.pressure > 0 ? event.pressure : fallbackPressure,
     };
   }
 
@@ -109,8 +86,11 @@ export function DrawingCanvas({
       return;
     }
 
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     drawingRef.current = true;
-    pointsRef.current = [pointFromEvent(event)];
+    const firstPoint = pointFromEvent(event);
+    strokeStartRef.current = firstPoint.t;
+    pointsRef.current = [firstPoint];
   }
 
   function handlePointerMove(event) {
@@ -147,6 +127,9 @@ export function DrawingCanvas({
       return;
     }
 
+    const startedAt = strokeStartRef.current ?? pointsRef.current[0]?.t ?? Date.now();
+    const endedAt = pointsRef.current.at(-1)?.t ?? startedAt;
+
     onStrokeCommitted?.({
       strokeId: `stroke-${crypto.randomUUID()}`,
       roomCode: round.roomCode,
@@ -156,9 +139,13 @@ export function DrawingCanvas({
       size,
       tool,
       points: [...pointsRef.current],
-      createdAt: Date.now(),
+      startedAt,
+      endedAt,
+      durationMs: Math.max(0, endedAt - startedAt),
+      createdAt: startedAt,
     });
     pointsRef.current = [];
+    strokeStartRef.current = null;
   }
 
   async function handleSubmitDrawing() {
@@ -177,45 +164,70 @@ export function DrawingCanvas({
   return (
     <div className="space-y-4">
       <section className="panel p-4 md:p-5">
-        {!readOnly ? (
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="pill">
-              <span className="text-sm text-slate-500">工具</span>
-              <button type="button" className={tool === "pen" ? "font-semibold text-slate-900" : "text-slate-500"} onClick={() => setTool("pen")}>
-                画笔
-              </button>
-              <button type="button" className={tool === "eraser" ? "font-semibold text-slate-900" : "text-slate-500"} onClick={() => setTool("eraser")}>
-                橡皮
-              </button>
-            </div>
-            <div className="pill gap-2">
-              {COLORS.map((swatch) => (
-                <button
-                  key={swatch}
-                  type="button"
-                  onClick={() => setColor(swatch)}
-                  className="h-7 w-7 rounded-full border-2"
-                  style={{ background: swatch, borderColor: color === swatch ? "#1f2937" : "transparent" }}
-                />
-              ))}
-            </div>
-            <div className="pill gap-3">
-              <span className="text-sm text-slate-500">粗细</span>
-              <input type="range" min="2" max="26" value={size} onChange={(event) => setSize(Number(event.target.value))} />
-            </div>
-          </div>
-        ) : null}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {!readOnly ? (
+            <>
+              <div className="pill">
+                <span className="text-sm text-slate-500">工具</span>
+                <button type="button" className={tool === "pen" ? "font-semibold text-slate-900" : "text-slate-500"} onClick={() => setTool("pen")}>
+                  画笔
+                </button>
+                <button type="button" className={tool === "eraser" ? "font-semibold text-slate-900" : "text-slate-500"} onClick={() => setTool("eraser")}>
+                  橡皮
+                </button>
+              </div>
+              <div className="pill gap-2">
+                {COLORS.map((swatch) => (
+                  <button
+                    key={swatch}
+                    type="button"
+                    onClick={() => setColor(swatch)}
+                    className="h-7 w-7 rounded-full border-2"
+                    style={{ background: swatch, borderColor: color === swatch ? "#1f2937" : "transparent" }}
+                  />
+                ))}
+              </div>
+              <div className="pill gap-3">
+                <span className="text-sm text-slate-500">粗细</span>
+                <input type="range" min="2" max="26" value={size} onChange={(event) => setSize(Number(event.target.value))} />
+              </div>
+            </>
+          ) : null}
 
-        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[#fff9f0]">
-          <canvas
-            ref={canvasRef}
-            className="aspect-square w-full touch-none"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-          />
+          {canReplay ? (
+            <div className="pill">
+              <button
+                type="button"
+                className={displayMode === "canvas" ? "font-semibold text-slate-900" : "text-slate-500"}
+                onClick={() => setDisplayMode("canvas")}
+              >
+                画面
+              </button>
+              <button
+                type="button"
+                className={displayMode === "replay" ? "font-semibold text-slate-900" : "text-slate-500"}
+                onClick={() => setDisplayMode("replay")}
+              >
+                回放
+              </button>
+            </div>
+          ) : null}
         </div>
+
+        {displayMode === "replay" && canReplay ? (
+          <StrokeReplayCanvas key={`replay-${round?.roundId}`} strokes={preparedStrokes} />
+        ) : (
+          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[#fff9f0]">
+            <canvas
+              ref={canvasRef}
+              className="aspect-square w-full touch-none"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+            />
+          </div>
+        )}
       </section>
 
       {!readOnly ? (
