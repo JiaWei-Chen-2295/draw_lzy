@@ -141,9 +141,12 @@ export function AdminRoomsClient() {
                 </div>
               </div>
 
-              <div className="mt-5">
+              <div className="mt-5 flex flex-wrap gap-3">
                 <Link href={`/admin/${room.roomCode}`} className="btn-primary">
                   查看历史记录
+                </Link>
+                <Link href={`/export?room=${room.roomCode}`} className="btn-secondary">
+                  导出视频
                 </Link>
               </div>
             </article>

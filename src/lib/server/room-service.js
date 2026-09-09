@@ -4,6 +4,7 @@ import { buildSummary, scoreRound } from "@/lib/scoring";
 import { generateRoomCode } from "@/lib/room-code";
 import { createRound } from "@/lib/round-engine";
 import { getRoom, saveRoom, appendRoomEvent, getRoomEvents, findRoomCodeByRoundId, listRooms } from "@/lib/server/room-store";
+import { listLocalRooms, readLocalRoom } from "@/lib/server/local-archive";
 import { validateGuessPayload, validateIntentPayload } from "@/lib/validators";
 
 function now() {
@@ -141,7 +142,18 @@ export async function joinRoom(roomCode, nickname) {
 }
 
 export async function readRoom(roomCode) {
-  const room = await getRoom(roomCode);
+  const localRoom = readLocalRoom(roomCode);
+  if (localRoom) {
+    return cloneRoom(localRoom);
+  }
+
+  let room = null;
+  try {
+    room = await getRoom(roomCode);
+  } catch {
+    room = null;
+  }
+
   if (room) {
     return cloneRoom(room);
   }
@@ -166,13 +178,26 @@ export async function readRoom(roomCode) {
 }
 
 export async function readRooms() {
-  const rooms = await listRooms();
-  const archiveRooms = await readArchiveIndex();
+  const localRooms = listLocalRooms();
+  let rooms = [];
+  let archiveRooms = [];
+
+  if (localRooms.length === 0) {
+    try {
+      rooms = await listRooms();
+    } catch {
+      rooms = [];
+    }
+
+    archiveRooms = await readArchiveIndex();
+  }
   const liveRoomCodes = new Set(rooms.map((room) => room?.roomCode).filter(Boolean));
+  const knownRoomCodes = new Set([...liveRoomCodes, ...localRooms.map((room) => room?.roomCode).filter(Boolean)]);
   const mergedRooms = [
     ...rooms,
+    ...localRooms.filter((room) => room?.roomCode && !liveRoomCodes.has(room.roomCode)),
     ...archiveRooms
-      .filter((entry) => entry?.roomCode && !liveRoomCodes.has(entry.roomCode))
+      .filter((entry) => entry?.roomCode && !knownRoomCodes.has(entry.roomCode))
       .map((entry) => ({
         roomCode: entry.roomCode,
         status: entry.status,

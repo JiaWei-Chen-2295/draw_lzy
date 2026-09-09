@@ -1,12 +1,14 @@
 {
-  "name": "any-door",
+  "name": "dokodemo-door",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export:json-video": "node scripts/export-json-video.mjs",
+    "export:json-video:interactive": "node scripts/interactive-json-video.mjs"
   },
   "dependencies": {
     "@upstash/redis": "^1.37.0",

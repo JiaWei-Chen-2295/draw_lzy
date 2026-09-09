@@ -1,4 +1,4 @@
-# 任意门
+# 任意门 / Dokodemo Door
 
 一个双人、双设备、面对面的抽象绘画小游戏。它不做“关系测试”，而是借由 6 轮抽象表达，让两个人交换“最近、现在，和一点点接下来”的理解偏差。
 
@@ -6,6 +6,7 @@
 
 - 规格原文：[specs/project-spec.md](/D:/a_my_project/draw_lzy/specs/project-spec.md)
 - 架构与实现说明：[docs/architecture.md](/D:/a_my_project/draw_lzy/docs/architecture.md)
+- JSON 透明视频导出：[docs/json-video-export.md](/D:/a_my_project/draw_lzy/docs/json-video-export.md)
 
 ## 当前实现范围
 
@@ -82,6 +83,14 @@ npm run dev
 /admin/房间码
 ```
 
+如果云端 Redis / Blob 不可用，但项目根目录保留了 `data/` 备份，后台会优先读取本地分析快照。要提取笔触动画和选区视频，打开：
+
+```txt
+/export
+```
+
+在页面中选择房间和轮次后，可以点击笔触进行保留/排除，或拖拽矩形选择输出区域，再按时间轴截取并导出视频。`data/` 目录只作为只读输入，不会被页面或导出流程改写。
+
 ## 常用命令
 
 ```bash
@@ -89,6 +98,7 @@ npm run dev
 npm run lint
 npm run build
 npm run start
+npm run export:json-video -- --input ./room-final.json --round-index 1 --output ./exports/round-1.webm
 ```
 
 ## 目录概览

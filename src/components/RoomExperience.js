@@ -50,8 +50,8 @@ export function RoomExperience({ roomCode }) {
     postAndApply,
     clearError,
   } = useRoomStore();
-  const [intent, setIntent] = useState({ focusChoice: "", vibeChoice: "" });
-  const [guess, setGuess] = useState({ focusChoice: "", vibeChoice: "" });
+  const [intent, setIntent] = useState({ vibeChoice: "" });
+  const [guess, setGuess] = useState({ vibeChoice: "" });
   const [localDraft, setLocalDraft] = useState(null);
   const pendingCanvasSyncRef = useRef(Promise.resolve());
 
@@ -88,6 +88,7 @@ export function RoomExperience({ roomCode }) {
   const isDrawer = currentRound?.drawerPlayerId === session?.playerId;
   const isGuesser = currentRound?.guesserPlayerId === session?.playerId;
   const isGameFinished = room?.status === "finished";
+  const isImmersiveDrawingPhase = currentRound?.phase === "drawing" && isDrawer;
   const activeLocalDraft = useMemo(() => {
     if (!currentRound || !localDraft || localDraft.roundId !== currentRound.roundId) {
       return null;
@@ -218,8 +219,8 @@ export function RoomExperience({ roomCode }) {
 
     await postAndApply("/api/rounds/start", { roomCode });
     setLocalDraft(null);
-    setIntent({ focusChoice: "", vibeChoice: "" });
-    setGuess({ focusChoice: "", vibeChoice: "" });
+    setIntent({ vibeChoice: "" });
+    setGuess({ vibeChoice: "" });
   }
 
   if (!session || session.roomCode !== roomCode) {
@@ -238,30 +239,46 @@ export function RoomExperience({ roomCode }) {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="panel grain overflow-hidden p-5 md:p-6">
-        <div className="relative">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">ANY DOOR</p>
-              <h1 className="mt-2 text-3xl font-semibold text-slate-900">任意门</h1>
+    <div className={isImmersiveDrawingPhase ? "room-experience-fullscreen flex h-full min-h-0 flex-col gap-4 overflow-hidden" : "space-y-5"}>
+      {!isImmersiveDrawingPhase ? (
+        <section className="panel grain overflow-hidden p-5 md:p-6">
+          <div className="relative">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">DOKODEMO DOOR</p>
+                <h1 className="mt-2 text-3xl font-semibold text-slate-900">任意门</h1>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="pill text-xs text-slate-600">房间 {room.roomCode}</span>
+                <span className="pill text-xs text-slate-600">{me?.nickname || "匿名玩家"}</span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="pill text-xs text-slate-600">房间 {room.roomCode}</span>
-              <span className="pill text-xs text-slate-600">{me?.nickname || "匿名玩家"}</span>
-            </div>
+            {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
           </div>
-          {error ? <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {room.status === "waiting" ? <RoomLobby room={room} session={session} onStart={handleStartGame} isLoading={isLoading} /> : null}
 
       {currentRound ? (
         <>
-          <PromptCard round={currentRound} />
+          {isImmersiveDrawingPhase ? (
+            <section className="min-h-0 flex-1 overflow-hidden">
+              <DrawingCanvas
+                round={currentRound}
+                strokes={displayedStrokes}
+                onStrokeCommitted={handleStrokeCommitted}
+                onReplaceAllStrokes={handleReplaceStrokes}
+                onSubmitDrawing={handleSubmitDrawing}
+                isSubmitting={isLoading}
+                fullViewport
+              />
+            </section>
+          ) : (
+            <PromptCard round={currentRound} />
+          )}
 
-          {currentRound.phase === "intent" ? (
+          {!isImmersiveDrawingPhase && currentRound.phase === "intent" ? (
             isDrawer ? (
               <IntentPicker round={currentRound} value={intent} onChange={setIntent} onSubmit={handleIntentSubmit} isSubmitting={isLoading} />
             ) : (
@@ -269,7 +286,7 @@ export function RoomExperience({ roomCode }) {
             )
           ) : null}
 
-          {currentRound.phase === "drawing" ? (
+          {!isImmersiveDrawingPhase && currentRound.phase === "drawing" ? (
             isDrawer ? (
               <DrawingCanvas
                 round={currentRound}

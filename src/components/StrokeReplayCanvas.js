@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_CANVAS } from "@/lib/constants";
 import { drawStrokeToElapsed, normalizeStrokes, paintCanvasBackground } from "@/lib/stroke-player";
 
 function getReplayWindow(strokes) {
@@ -18,13 +19,56 @@ function getReplayWindow(strokes) {
   };
 }
 
+function getStrokeCanvasSize(strokes) {
+  const points = strokes.flatMap((stroke) => stroke?.points ?? []);
+  const maxX = points.reduce((current, point) => Math.max(current, Number(point?.x) || 0), 0);
+  const maxY = points.reduce((current, point) => Math.max(current, Number(point?.y) || 0), 0);
+
+  return {
+    width: Math.max(DEFAULT_CANVAS.width, Math.ceil(maxX + 16)),
+    height: Math.max(DEFAULT_CANVAS.height, Math.ceil(maxY + 16)),
+  };
+}
+
 export function StrokeReplayCanvas({ strokes, className = "aspect-square w-full touch-none", autoPlay = true }) {
   const canvasRef = useRef(null);
+  const viewportRef = useRef(null);
   const animationFrameRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(autoPlay && (strokes?.length ?? 0) > 0);
   const [playheadMs, setPlayheadMs] = useState(0);
+  const [canvasViewport, setCanvasViewport] = useState({ width: 0, height: 0 });
   const normalizedStrokes = useMemo(() => normalizeStrokes(strokes ?? []), [strokes]);
+  const canvasSize = useMemo(() => getStrokeCanvasSize(normalizedStrokes), [normalizedStrokes]);
   const replayWindow = useMemo(() => getReplayWindow(normalizedStrokes), [normalizedStrokes]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return undefined;
+    }
+
+    const updateViewport = () => {
+      const rect = viewport.getBoundingClientRect();
+      const nextSize = Math.max(320, Math.floor(Math.min(rect.width, rect.height)));
+
+      setCanvasViewport((currentValue) => {
+        if (currentValue.width === nextSize && currentValue.height === nextSize) {
+          return currentValue;
+        }
+
+        return { width: nextSize, height: nextSize };
+      });
+    };
+
+    updateViewport();
+
+    const resizeObserver = new ResizeObserver(() => updateViewport());
+    resizeObserver.observe(viewport);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -32,10 +76,8 @@ export function StrokeReplayCanvas({ strokes, className = "aspect-square w-full 
       return undefined;
     }
 
-    const scale = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const width = Math.max(320, Math.floor(rect.width * scale));
-    const height = Math.max(320, Math.floor(rect.width * scale));
+    const width = canvasSize.width;
+    const height = canvasSize.height;
 
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
@@ -51,7 +93,7 @@ export function StrokeReplayCanvas({ strokes, className = "aspect-square w-full 
     });
 
     return undefined;
-  }, [normalizedStrokes, playheadMs, replayWindow.startAt]);
+  }, [canvasSize.height, canvasSize.width, normalizedStrokes, playheadMs, replayWindow.startAt]);
 
   useEffect(() => {
     if (!isPlaying || replayWindow.durationMs <= 0) {
@@ -116,8 +158,16 @@ export function StrokeReplayCanvas({ strokes, className = "aspect-square w-full 
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[#fff9f0]">
-        <canvas ref={canvasRef} className={className} />
+      <div ref={viewportRef} className="flex min-h-0 w-full items-center justify-center overflow-hidden rounded-[28px] border border-slate-200 bg-[#fff9f0]">
+        <canvas
+          ref={canvasRef}
+          className={className}
+          style={
+            canvasViewport.width && canvasViewport.height
+              ? { width: `${canvasViewport.width}px`, height: `${canvasViewport.height}px` }
+              : undefined
+          }
+        />
       </div>
 
       <div className="space-y-2">

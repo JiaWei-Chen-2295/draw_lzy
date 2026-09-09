@@ -4,7 +4,7 @@ export default async function RoomPage({ params }) {
   const { roomCode } = await params;
 
   return (
-    <main className="app-shell page-screen flex-1">
+    <main className="app-shell room-page-screen flex flex-1 flex-col overflow-hidden">
       <RoomExperience roomCode={roomCode} />
     </main>
   );

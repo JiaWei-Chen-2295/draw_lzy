@@ -6,7 +6,7 @@ export default function HomePage() {
       <section className="panel grain relative overflow-hidden px-6 py-10 md:px-10 md:py-12">
         <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-slate-500">ANY DOOR</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-slate-500">DOKODEMO DOOR</p>
             <h1 className="mt-4 max-w-xl text-5xl font-semibold tracking-tight text-slate-900 md:text-7xl">任意门</h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
               画的不是东西，是现在、最近，还有一点点接下来。两个人，两台设备，轮流用颜色和线条猜彼此想表达的感觉。
@@ -21,6 +21,9 @@ export default function HomePage() {
               </Link>
               <Link href="/admin" className="btn-ghost">
                 管理回放
+              </Link>
+              <Link href="/export" className="btn-ghost">
+                剪辑导出
               </Link>
             </div>
           </div>

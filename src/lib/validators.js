@@ -1,5 +1,3 @@
-import { FOCUS_OPTIONS } from "@/lib/constants";
-
 export function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -29,24 +27,16 @@ export function validateRoomCode(roomCode) {
 }
 
 export function validateIntentPayload(payload, vibeOptions) {
-  if (!payload || !FOCUS_OPTIONS.includes(payload.focusChoice)) {
-    return "先选这张画更像在说什么";
-  }
-
-  if (!payload.vibeChoice || !vibeOptions.includes(payload.vibeChoice)) {
-    return "再选一个最接近的感觉";
+  if (!payload?.vibeChoice || !vibeOptions.includes(payload.vibeChoice)) {
+    return "选一个最接近的感觉";
   }
 
   return null;
 }
 
 export function validateGuessPayload(payload, vibeOptions) {
-  if (!payload || !FOCUS_OPTIONS.includes(payload.focusChoice)) {
-    return "先选你觉得这张画更像在说什么";
-  }
-
-  if (!payload.vibeChoice || !vibeOptions.includes(payload.vibeChoice)) {
-    return "再选一个你觉得最接近的感觉";
+  if (!payload?.vibeChoice || !vibeOptions.includes(payload.vibeChoice)) {
+    return "选一个你觉得最接近的感觉";
   }
 
   return null;

@@ -156,13 +156,11 @@ export function AdminReplayClient({ initialRoomCode = "" }) {
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="stat-card">
                   <div className="text-sm text-slate-500">作画者原本想表达</div>
-                  <div className="mt-2 text-base font-semibold text-slate-900">{round.drawerIntent?.focusChoice || "-"}</div>
-                  <div className="mt-1 text-sm text-slate-600">{round.drawerIntent?.vibeChoice || "-"}</div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">{round.drawerIntent?.vibeChoice || "-"}</div>
                 </div>
                 <div className="stat-card">
                   <div className="text-sm text-slate-500">猜测者最后选择</div>
-                  <div className="mt-2 text-base font-semibold text-slate-900">{round.guesserAnswer?.focusChoice || "-"}</div>
-                  <div className="mt-1 text-sm text-slate-600">{round.guesserAnswer?.vibeChoice || "-"}</div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">{round.guesserAnswer?.vibeChoice || "-"}</div>
                 </div>
               </div>
             </article>

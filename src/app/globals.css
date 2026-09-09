@@ -95,6 +95,10 @@ textarea {
   min-height: calc(100dvh - 40px);
 }
 
+.room-page-screen {
+  height: calc(100dvh - 40px);
+}
+
 .panel {
   background: var(--card);
   border: 1px solid var(--line);
@@ -206,6 +210,21 @@ textarea {
   padding: 16px;
 }
 
+.room-experience-fullscreen {
+  height: 100%;
+  min-height: 0;
+}
+
+.drawing-workspace {
+  min-height: 0;
+  height: 100%;
+}
+
+.drawing-board-shell canvas,
+.stroke-replay-canvas {
+  display: block;
+}
+
 @media (min-width: 768px) {
   .app-shell {
     padding: 24px 28px 36px;
@@ -213,5 +232,13 @@ textarea {
 
   .page-screen {
     min-height: calc(100dvh - 48px);
+  }
+
+  .room-page-screen {
+    height: calc(100dvh - 48px);
+  }
+
+  .room-experience-fullscreen {
+    height: 100%;
   }
 }

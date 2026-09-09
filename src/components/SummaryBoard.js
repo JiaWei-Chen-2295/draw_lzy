@@ -50,11 +50,7 @@ export function SummaryBoard({ room }) {
             <div className="mt-2 text-3xl font-semibold">{summary?.totalRounds ?? rounds.length}</div>
           </div>
           <div className="stat-card">
-            <div className="text-sm text-slate-500">第一题对上的次数</div>
-            <div className="mt-2 text-3xl font-semibold">{summary?.focusHits ?? 0}</div>
-          </div>
-          <div className="stat-card">
-            <div className="text-sm text-slate-500">第二题对上的次数</div>
+            <div className="text-sm text-slate-500">感觉对上的次数</div>
             <div className="mt-2 text-3xl font-semibold">{summary?.vibeHits ?? 0}</div>
           </div>
           <div className="stat-card">
@@ -74,7 +70,7 @@ export function SummaryBoard({ room }) {
                 <div className="text-sm text-slate-500">第 {round.roundIndex} 轮</div>
                 <h2 className="mt-1 text-xl font-semibold text-slate-900">{round.promptText}</h2>
               </div>
-              <span className="pill text-xs text-slate-600">分数 {round.result?.score ?? 0}/2</span>
+              <span className="pill text-xs text-slate-600">分数 {round.result?.score ?? 0}/1</span>
             </div>
 
             {round.drawingAssets.previewSrc ? (
@@ -109,13 +105,11 @@ export function SummaryBoard({ room }) {
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <div className="stat-card">
                 <div className="text-sm text-slate-500">原本想的是</div>
-                <div className="mt-2 text-base font-semibold">{round.drawerIntent?.focusChoice || "-"}</div>
-                <div className="text-sm text-slate-600">{round.drawerIntent?.vibeChoice || "-"}</div>
+                <div className="mt-2 text-base font-semibold">{round.drawerIntent?.vibeChoice || "-"}</div>
               </div>
               <div className="stat-card">
                 <div className="text-sm text-slate-500">后来猜的是</div>
-                <div className="mt-2 text-base font-semibold">{round.guesserAnswer?.focusChoice || "-"}</div>
-                <div className="text-sm text-slate-600">{round.guesserAnswer?.vibeChoice || "-"}</div>
+                <div className="mt-2 text-base font-semibold">{round.guesserAnswer?.vibeChoice || "-"}</div>
               </div>
             </div>
           </article>

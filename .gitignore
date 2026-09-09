@@ -25,6 +25,10 @@
 *.pem
 /tmp-app
 
+# local working copies / scratch (not part of the project)
+/_backups/
+/tmp/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

@@ -12,7 +12,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-  title: "任意门",
+  title: "任意门 | Dokodemo Door",
   description: "一个用抽象图形画感觉、再互相猜一猜的双人小游戏",
 };
 

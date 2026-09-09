@@ -6,7 +6,6 @@ export async function POST(request, { params }) {
     const { roundId } = await params;
     const body = await request.json();
     const room = await submitGuess(roundId, body.playerId, {
-      focusChoice: body.focusChoice,
       vibeChoice: body.vibeChoice,
     });
 
